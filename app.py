@@ -23,6 +23,11 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
 from email import encoders
+import gspread
+from google.oauth2.service_account import Credentials
+from datetime import datetime
+
+
 # ✅ Compatibilidade entre Python 3.10 e 3.11+
 try:
     import tomllib
@@ -85,19 +90,30 @@ OPENAI_API_KEY, SMTP_EMAIL, SMTP_SENHA, SMTP_SERVIDOR, SMTP_PORTA, origem_segred
 # ============================================================
 
 def registrar_uso(usuario_nome, usuario_email, arquivo):
-    """Registra cada uso do app para controle/cobrança."""
-    novo = not LOG_FILE.exists()
-    with open(LOG_FILE, "a", newline="", encoding="utf-8") as csvfile:
-        writer = csv.writer(csvfile)
-        if novo:
-            writer.writerow(["Data", "Hora", "Usuário", "Email", "Arquivo"])
-        writer.writerow([
-            datetime.now().strftime("%d/%m/%Y"),
-            datetime.now().strftime("%H:%M:%S"),
-            usuario_nome,
-            usuario_email,
-            arquivo
+    """Registra informações de uso no Google Sheets"""
+    try:
+        # Lê credenciais do secrets do Streamlit
+        creds_info = st.secrets["google_service_account"]
+        credentials = Credentials.from_service_account_info(creds_info, scopes=[
+            "https://www.googleapis.com/auth/spreadsheets"
         ])
+
+        # Conecta ao Google Sheets
+        client = gspread.authorize(credentials)
+        sheet_id = st.secrets["SHEET_ID"]
+        sheet = client.open_by_key(sheet_id).sheet1
+
+        # Registra linha
+        data = datetime.now().strftime("%d/%m/%Y")
+        hora = datetime.now().strftime("%H:%M:%S")
+        row = [data, hora, usuario_nome, usuario_email, arquivo]
+
+        sheet.append_row(row)
+
+        st.success("✅ Registro salvo com sucesso no Google Sheets!")
+
+    except Exception as e:
+        st.warning(f"⚠️ Erro ao registrar no Google Sheets: {e}")
 
 def transcrever_audio(audio_file):
     """Transcreve o áudio com Whisper."""
@@ -135,9 +151,11 @@ Extraia da transcrição:
 6. PONTOS IMPORTANTES
 7. PRÓXIMOS PASSOS
 8. OBSERVAÇÕES
+9. GERE GRAFICOS QUANDO POSSÍVEL
 """
     resp = client.chat.completions.create(
-        model="gpt-4-turbo-preview",
+        #model="gpt-4-turbo-preview",
+        model="gpt-4o-mini"
         messages=[
             {"role": "system", "content": prompt},
             {"role": "user", "content": transcricao}
@@ -188,7 +206,7 @@ Arquivo: {nome_arquivo}
 Data: {datetime.now().strftime('%d/%m/%Y %H:%M')}
 
 Atenciosamente,  
-Audio Insights 🚀
+Clayton Pereira 🚀
 """
 
     msg.attach(MIMEText(corpo, "plain"))
@@ -243,7 +261,7 @@ def main():
         st.balloons()
 
     st.markdown("---")
-    st.caption("Desenvolvido por Clayton Pereira | Powered by OpenAI + Streamlit")
+    st.caption("Powered by Clayton Pereira and OpenAI")
 
 
 if __name__ == "__main__":
