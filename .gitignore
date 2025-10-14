@@ -1,0 +1,13 @@
+# Arquivos e pastas sensíveis
+.streamlit/secrets.toml
+__pycache__/
+*.pyc
+
+# Resultados locais
+resultados/
+log_usuarios.csv
+temp/
+
+# Ambiente virtual
+venv/
+.env/

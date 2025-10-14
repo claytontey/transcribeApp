@@ -1,8 +1,12 @@
 """
-🎤 Audio Insights - Serviço Automatizado
-Transcreve áudios, gera insights e envia relatório em PDF por email.
+🎤 Audio Insights - Relatórios Inteligentes
+Transcreve áudios, gera insights e envia relatório em PDF por e-mail.
+Compatível com uso local e Streamlit Cloud.
 """
 
+# ============================================================
+# 🔧 IMPORTAÇÕES
+# ============================================================
 import streamlit as st
 import os
 import csv
@@ -19,32 +23,69 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
 from email import encoders
+# ✅ Compatibilidade entre Python 3.10 e 3.11+
+try:
+    import tomllib
+except ModuleNotFoundError:
+    import tomli as tomllib
+
 
 # ============================================================
 # ⚙️ CONFIGURAÇÃO INICIAL
 # ============================================================
-
 st.set_page_config(page_title="Audio Insights", page_icon="🎤", layout="wide")
 
-# Diretórios
+# 📂 Diretórios
 PASTA_RESULTADOS = Path("resultados")
 PASTA_RESULTADOS.mkdir(exist_ok=True)
-
 LOG_FILE = Path("log_usuarios.csv")
 
-# Carrega segredos do Streamlit Cloud (definidos em Secrets)
-OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
-SMTP_EMAIL = st.secrets["SMTP_EMAIL"]
-SMTP_SENHA = st.secrets["SMTP_SENHA"]
-SMTP_SERVIDOR = st.secrets["SMTP_SERVIDOR"]
-SMTP_PORTA = st.secrets["SMTP_PORTA"]
+# ============================================================
+# 🔒 CARREGAMENTO DE SEGREDOS (Cloud ou Local)
+# ============================================================
+
+def carregar_segredos():
+    """Lê credenciais do Streamlit Cloud ou de um arquivo local (.streamlit/secrets.toml)."""
+    try:
+        # 🟢 Caso esteja no Streamlit Cloud
+        openai_key = st.secrets["OPENAI_API_KEY"]
+        smtp_email = st.secrets["SMTP_EMAIL"]
+        smtp_senha = st.secrets["SMTP_SENHA"]
+        smtp_servidor = st.secrets["SMTP_SERVIDOR"]
+        smtp_porta = st.secrets["SMTP_PORTA"]
+        origem = "Streamlit Cloud"
+    except Exception:
+        # 🟡 Fallback local
+        try:
+            caminho_local = Path(".streamlit/secrets.toml")
+            if caminho_local.exists():
+                with open(caminho_local, "rb") as f:
+                    data = tomllib.load(f)
+                openai_key = data.get("OPENAI_API_KEY")
+                smtp_email = data.get("SMTP_EMAIL")
+                smtp_senha = data.get("SMTP_SENHA")
+                smtp_servidor = data.get("SMTP_SERVIDOR", "smtp.gmail.com")
+                smtp_porta = data.get("SMTP_PORTA", 587)
+                origem = "arquivo local"
+            else:
+                st.error("❌ Nenhum segredo encontrado. Configure no Streamlit Cloud ou crie .streamlit/secrets.toml.")
+                st.stop()
+        except Exception as e:
+            st.error(f"❌ Erro ao carregar segredos locais: {e}")
+            st.stop()
+
+    return openai_key, smtp_email, smtp_senha, smtp_servidor, smtp_porta, origem
+
+
+# 🔑 Carrega segredos automaticamente
+OPENAI_API_KEY, SMTP_EMAIL, SMTP_SENHA, SMTP_SERVIDOR, SMTP_PORTA, origem_segredos = carregar_segredos()
 
 # ============================================================
 # 🔄 FUNÇÕES PRINCIPAIS
 # ============================================================
 
 def registrar_uso(usuario_nome, usuario_email, arquivo):
-    """Registra cada uso do app para controle/cobrança"""
+    """Registra cada uso do app para controle/cobrança."""
     novo = not LOG_FILE.exists()
     with open(LOG_FILE, "a", newline="", encoding="utf-8") as csvfile:
         writer = csv.writer(csvfile)
@@ -59,12 +100,15 @@ def registrar_uso(usuario_nome, usuario_email, arquivo):
         ])
 
 def transcrever_audio(audio_file):
-    """Transcreve o áudio com Whisper"""
-    client = OpenAI(api_key=OPENAI_API_KEY)
+    """Transcreve o áudio com Whisper."""
+    import os
+    from openai import OpenAI
+    os.environ["OPENAI_API_KEY"] = OPENAI_API_KEY
+    client = OpenAI()
+
     with tempfile.NamedTemporaryFile(delete=False, suffix=Path(audio_file.name).suffix) as tmp:
         tmp.write(audio_file.getvalue())
         tmp_path = tmp.name
-
     with open(tmp_path, "rb") as audio:
         result = client.audio.transcriptions.create(
             model="whisper-1",
@@ -75,10 +119,13 @@ def transcrever_audio(audio_file):
     return result.text
 
 def analisar_com_ia(transcricao):
-    """Analisa a transcrição com GPT-4"""
-    client = OpenAI(api_key=OPENAI_API_KEY)
+    """Analisa a transcrição com GPT-4."""
+    import os
+    from openai import OpenAI
+    os.environ["OPENAI_API_KEY"] = OPENAI_API_KEY
+    client = OpenAI()
     prompt = """
-Você é um assistente de análise de reuniões.
+Você é um assistente especializado em análise de reuniões.
 Extraia da transcrição:
 1. RESUMO EXECUTIVO
 2. PARTICIPANTES
@@ -100,7 +147,7 @@ Extraia da transcrição:
     return resp.choices[0].message.content
 
 def gerar_pdf(nome_arquivo, transcricao, analise, usuario_nome):
-    """Cria o PDF do relatório"""
+    """Cria o PDF do relatório."""
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     pdf_path = PASTA_RESULTADOS / f"relatorio_{usuario_nome}_{timestamp}.pdf"
 
@@ -122,12 +169,11 @@ def gerar_pdf(nome_arquivo, transcricao, analise, usuario_nome):
         Paragraph("<b>📝 Transcrição Completa</b>", styles["Heading2"]),
         Paragraph(transcricao.replace("\n", "<br/>"), normal)
     ]
-
     doc.build(story)
     return str(pdf_path)
 
 def enviar_email(destinatario, pdf_path, nome_arquivo):
-    """Envia o relatório por email usando as credenciais do app"""
+    """Envia o relatório por e-mail."""
     msg = MIMEMultipart()
     msg["From"] = SMTP_EMAIL
     msg["To"] = destinatario
@@ -159,14 +205,14 @@ Audio Insights 🚀
     server.send_message(msg)
     server.quit()
 
-
 # ============================================================
 # 🧭 INTERFACE STREAMLIT
 # ============================================================
 
 def main():
     st.title("🎤 Audio Insights - Relatórios Inteligentes")
-    st.markdown("Envie seu áudio e receba um relatório gerado por IA diretamente no seu e-mail.")
+    st.markdown(f"🔐 Rodando com segredos de: **{origem_segredos}**")
+    st.divider()
 
     usuario_nome = st.text_input("👤 Nome ou ID de Cadastro")
     email_destino = st.text_input("📧 Email para envio do relatório")
