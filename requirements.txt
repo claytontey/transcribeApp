@@ -1,8 +1,7 @@
-streamlit==1.29.0
-openai==1.3.7
-reportlab==4.0.7
-pydub==0.25.1
+# Fixar dependências críticas
+openai==1.10.0
 ffmpeg-python==0.2.0
+reportlab==4.0.7
 gspread==6.1.2
 google-auth==2.33.0
-audioop-lts==0.2.1
+streamlit==1.29.0
