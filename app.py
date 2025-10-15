@@ -28,6 +28,8 @@ from google.oauth2.service_account import Credentials
 from datetime import datetime
 from pydub import AudioSegment
 from pydub.utils import which
+import ffmpeg
+
 
 
 
@@ -124,9 +126,6 @@ def registrar_uso(usuario_nome, usuario_email, arquivo):
 def transcrever_audio(audio_file):
     """Transcreve áudio em qualquer formato compatível (mp3, m4a, wav, ogg, webm, etc)"""
     try:
-        # garante que o arquivo no formato whatsapp seja reconhecido
-        AudioSegment.converter = which("ffmpeg")
-        AudioSegment.ffprobe = which("ffprobe")
         client = OpenAI(api_key=OPENAI_API_KEY)
 
         # Salva temporariamente o arquivo original
@@ -137,9 +136,9 @@ def transcrever_audio(audio_file):
         # Define caminho de saída convertido
         tmp_output_path = tmp_input_path.replace(Path(tmp_input_path).suffix, ".wav")
 
-        # Converte automaticamente para WAV (formato aceito pelo Whisper)
-        audio = AudioSegment.from_file(tmp_input_path)
-        audio.export(tmp_output_path, format="wav")
+        # Conversão com ffmpeg-python
+        ffmpeg.input(tmp_input_path).output(tmp_output_path).run(overwrite_output=True)
+
 
         # Transcreve com Whisper
         with open(tmp_output_path, "rb") as audio_converted:
