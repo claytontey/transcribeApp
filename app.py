@@ -26,6 +26,11 @@ from email import encoders
 import gspread
 from google.oauth2.service_account import Credentials
 from datetime import datetime
+from pydub import AudioSegment
+from pydub.utils import which
+
+
+
 
 
 # ✅ Compatibilidade entre Python 3.10 e 3.11+
@@ -115,24 +120,44 @@ def registrar_uso(usuario_nome, usuario_email, arquivo):
     except Exception as e:
         st.warning(f"⚠️ Erro ao registrar no Google Sheets: {e}")
 
-def transcrever_audio(audio_file):
-    """Transcreve o áudio com Whisper."""
-    import os
-    from openai import OpenAI
-    os.environ["OPENAI_API_KEY"] = OPENAI_API_KEY
-    client = OpenAI()
 
-    with tempfile.NamedTemporaryFile(delete=False, suffix=Path(audio_file.name).suffix) as tmp:
-        tmp.write(audio_file.getvalue())
-        tmp_path = tmp.name
-    with open(tmp_path, "rb") as audio:
-        result = client.audio.transcriptions.create(
-            model="whisper-1",
-            file=audio,
-            language="pt"
-        )
-    os.unlink(tmp_path)
-    return result.text
+def transcrever_audio(audio_file):
+    """Transcreve áudio em qualquer formato compatível (mp3, m4a, wav, ogg, webm, etc)"""
+    try:
+        # garante que o arquivo no formato whatsapp seja reconhecido
+        AudioSegment.converter = which("ffmpeg")
+        AudioSegment.ffprobe = which("ffprobe")
+        client = OpenAI(api_key=OPENAI_API_KEY)
+
+        # Salva temporariamente o arquivo original
+        with tempfile.NamedTemporaryFile(delete=False, suffix=Path(audio_file.name).suffix) as tmp_input:
+            tmp_input.write(audio_file.getvalue())
+            tmp_input_path = tmp_input.name
+
+        # Define caminho de saída convertido
+        tmp_output_path = tmp_input_path.replace(Path(tmp_input_path).suffix, ".wav")
+
+        # Converte automaticamente para WAV (formato aceito pelo Whisper)
+        audio = AudioSegment.from_file(tmp_input_path)
+        audio.export(tmp_output_path, format="wav")
+
+        # Transcreve com Whisper
+        with open(tmp_output_path, "rb") as audio_converted:
+            transcription = client.audio.transcriptions.create(
+                model="whisper-1",
+                file=audio_converted,
+                language="pt"
+            )
+
+        # Remove temporários
+        os.unlink(tmp_input_path)
+        os.unlink(tmp_output_path)
+
+        return transcription.text
+
+    except Exception as e:
+        st.error(f"❌ Erro na transcrição: {str(e)}")
+        return None
 
 def analisar_com_ia(transcricao):
     """Analisa a transcrição com GPT-4."""
@@ -234,7 +259,11 @@ def main():
 
     usuario_nome = st.text_input("👤 Nome ou ID de Cadastro")
     email_destino = st.text_input("📧 Email para envio do relatório")
-    audio_file = st.file_uploader("🎙️ Selecione o arquivo de áudio", type=["mp3", "wav", "m4a", "webm"])
+    audio_file = st.file_uploader(
+    "Selecione o arquivo de áudio",
+    type=['mp3', 'mp4', 'mpeg', 'mpga', 'm4a', 'wav', 'webm', 'ogg', 'oga'],
+    help="Formatos suportados: MP3, M4A, WAV, OGG, WebM, etc."
+)
 
     if st.button("🚀 Processar e Enviar"):
         if not usuario_nome or not email_destino or not audio_file:
@@ -263,6 +292,8 @@ def main():
     st.markdown("---")
     st.caption("Powered by Clayton Pereira and OpenAI")
     #st.write("✅ Secrets carregados:", list(st.secrets.keys()))
+
+
 
 
 
