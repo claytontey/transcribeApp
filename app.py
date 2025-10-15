@@ -262,6 +262,8 @@ def main():
 
     st.markdown("---")
     st.caption("Powered by Clayton Pereira and OpenAI")
+    st.write("✅ Secrets carregados:", list(st.secrets.keys()))
+
 
 
 if __name__ == "__main__":
