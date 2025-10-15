@@ -43,9 +43,10 @@ import imageio_ffmpeg
 st.set_page_config(page_title="Audio Insights", page_icon="🎤", layout="wide")
 
 if not which("ffmpeg"):
-    ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
-    st.info(f"⚙️ ffmpeg configurado automaticamente em: {ffmpeg_path}")
-
+    st.error("❌ ffmpeg não encontrado. No conda: `conda install -c conda-forge ffmpeg`")
+    st.stop()
+else:
+    print("✅ ffmpeg encontrado com sucesso!")
 
 # Pastas e arquivos
 PASTA_RESULTADOS = Path("resultados")
