@@ -32,9 +32,17 @@ from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
 from email import encoders
 
+from shutil import which
+import imageio_ffmpeg
+
 # =========================
 # Configuração de página
 # =========================
+# Verifica se o ffmpeg está acessível
+if not which("ffmpeg"):
+    ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
+    st.info(f"⚙️ ffmpeg configurado automaticamente em: {ffmpeg_path}")
+    
 st.set_page_config(page_title="Audio Insights", page_icon="🎤", layout="wide")
 
 # Pastas e arquivos
