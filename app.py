@@ -34,6 +34,9 @@ from email import encoders
 
 from shutil import which
 import imageio_ffmpeg
+from pydub.utils import which as pydub_which
+from pydub import AudioSegment
+
 
 # =========================
 # Configuração de página
@@ -45,20 +48,22 @@ st.set_page_config(page_title="Audio Insights", page_icon="🎤", layout="wide")
 # Tenta encontrar o ffmpeg global
 ffmpeg_path = which("ffmpeg")
 
-if not ffmpeg_path:
-    # Se não encontrar, usa o binário embutido do imageio_ffmpeg
-    try:
-        ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
-        os.environ["PATH"] += os.pathsep + os.path.dirname(ffmpeg_path)
-        os.environ["IMAGEIO_FFMPEG_EXE"] = ffmpeg_path
-        print(f"⚙️ ffmpeg configurado automaticamente em: {ffmpeg_path}")
-    except Exception as e:
-        st.error(f"❌ Não foi possível configurar o ffmpeg automaticamente: {e}")
-        st.stop()
-else:
-    print(f"✅ ffmpeg encontrado: {ffmpeg_path}")
+try:
+    ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
+    ffprobe_path = ffmpeg_path.replace("ffmpeg", "ffprobe")
 
-    
+    # Força o pydub a usar esse caminho
+    AudioSegment.converter = ffmpeg_path
+    AudioSegment.ffmpeg = ffmpeg_path
+    AudioSegment.ffprobe = ffprobe_path
+
+    print(f"✅ ffmpeg configurado para o pydub: {ffmpeg_path}")
+
+except Exception as e:
+    st.error(f"❌ Erro ao configurar o ffmpeg para o pydub: {e}")
+    st.stop()
+
+
 # Pastas e arquivos
 PASTA_RESULTADOS = Path("resultados")
 PASTA_RESULTADOS.mkdir(exist_ok=True)
