@@ -42,12 +42,23 @@ import imageio_ffmpeg
 
 st.set_page_config(page_title="Audio Insights", page_icon="🎤", layout="wide")
 
-if not which("ffmpeg"):
-    st.error("❌ ffmpeg não encontrado. No conda: `conda install -c conda-forge ffmpeg`")
-    st.stop()
-else:
-    print("✅ ffmpeg encontrado com sucesso!")
+# Tenta encontrar o ffmpeg global
+ffmpeg_path = which("ffmpeg")
 
+if not ffmpeg_path:
+    # Se não encontrar, usa o binário embutido do imageio_ffmpeg
+    try:
+        ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
+        os.environ["PATH"] += os.pathsep + os.path.dirname(ffmpeg_path)
+        os.environ["IMAGEIO_FFMPEG_EXE"] = ffmpeg_path
+        print(f"⚙️ ffmpeg configurado automaticamente em: {ffmpeg_path}")
+    except Exception as e:
+        st.error(f"❌ Não foi possível configurar o ffmpeg automaticamente: {e}")
+        st.stop()
+else:
+    print(f"✅ ffmpeg encontrado: {ffmpeg_path}")
+
+    
 # Pastas e arquivos
 PASTA_RESULTADOS = Path("resultados")
 PASTA_RESULTADOS.mkdir(exist_ok=True)
