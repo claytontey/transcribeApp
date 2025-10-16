@@ -298,44 +298,70 @@ def main():
     st.caption(f"🔐 Segredos carregados de: **{SECRETS['origem']}**")
     st.divider()
 
-    usuario_nome = st.text_input("👤 Nome ou ID de Cadastro")
-    email_destino = st.text_input("📧 Email para envio do relatório")
-    audio_file = st.file_uploader(
-        "Selecione o arquivo de áudio",
-        type=["mp3", "mp4", "mpeg", "mpga", "m4a", "wav", "webm", "ogg", "oga"],
-        help="Formatos suportados: MP3, M4A, WAV, OGG (WhatsApp/Opus), WebM, etc."
-    )
+    # Inicializa o estado
+    if "done" not in st.session_state:
+        st.session_state.done = False
 
-    if st.button("🚀 Processar e Enviar"):
-        if not usuario_nome or not email_destino or not audio_file:
-            st.error("❌ Preencha todos os campos.")
-            return
+    if not st.session_state.done:
+        # Formulário interativo
+        with st.form("form_audio"):
+            usuario_nome = st.text_input("👤 Nome ou ID de Cadastro")
+            email_destino = st.text_input("📧 Email para envio do relatório")
+            audio_file = st.file_uploader(
+                "Selecione o arquivo de áudio",
+                type=["mp3", "mp4", "mpeg", "mpga", "m4a", "wav", "webm", "ogg", "oga"],
+                help="Formatos suportados: MP3, M4A, WAV, OGG (WhatsApp/Opus), WebM, etc."
+            )
 
-        with st.spinner("🎧 Transcrevendo áudio..."):
-            transcricao = transcrever_audio(audio_file)
-            if not transcricao:
+            submitted = st.form_submit_button("🚀 Processar e Enviar")
+
+        if submitted:
+            if not usuario_nome or not email_destino or not audio_file:
+                st.error("❌ Preencha todos os campos antes de continuar.")
                 return
-            st.success("✅ Transcrição concluída!")
 
-        with st.spinner("🧠 Analisando conteúdo..."):
-            analise = analisar_com_ia(transcricao)
-            if not analise:
-                return
-            st.success("✅ Análise concluída!")
+            with st.spinner("🎧 Transcrevendo áudio..."):
+                transcricao = transcrever_audio(audio_file)
+                if not transcricao:
+                    return
+                st.success("✅ Transcrição concluída!")
 
-        with st.spinner("📄 Gerando PDF..."):
-            pdf_path = gerar_pdf(audio_file.name, transcricao, analise, usuario_nome)
-            st.success("✅ PDF gerado!")
+            with st.spinner("🧠 Analisando conteúdo..."):
+                analise = analisar_com_ia(transcricao)
+                if not analise:
+                    return
+                st.success("✅ Análise concluída!")
 
-        with st.spinner("📨 Enviando relatório..."):
-            enviar_email(email_destino, pdf_path, audio_file.name)
-            st.success(f"✅ Enviado para {email_destino}!")
+            with st.spinner("📄 Gerando relatório em PDF..."):
+                pdf_path = gerar_pdf(audio_file.name, transcricao, analise, usuario_nome)
+                st.success("✅ PDF gerado!")
 
-        registrar_uso(usuario_nome, email_destino, audio_file.name)
-        st.balloons()
+            with st.spinner("📨 Enviando relatório por e-mail..."):
+                enviar_email(email_destino, pdf_path, audio_file.name)
+                st.success(f"✅ Relatório enviado para {email_destino}!")
+
+            registrar_uso(usuario_nome, email_destino, audio_file.name)
+
+            # 🎉 Mensagem final
+            st.balloons()
+            st.success(f"🎉 Obrigado, {usuario_nome}! Seu relatório foi enviado com sucesso.")
+
+            # Marca como concluído e limpa campos
+            st.session_state.done = True
+            st.rerun()
+
+    else:
+        # Tela pós-envio
+        st.markdown("## 🙌 Obrigado por usar o Audio Insights!")
+        st.info("Seu relatório foi enviado com sucesso e registrado.")
+        if st.button("🔄 Novo envio"):
+            # Reinicia o estado e recarrega
+            st.session_state.clear()
+            st.rerun()
 
     st.markdown("---")
     st.caption("Powered by Clayton Pereira + OpenAI")
+
 
 if __name__ == "__main__":
     main()
